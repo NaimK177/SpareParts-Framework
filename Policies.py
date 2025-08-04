@@ -4,7 +4,9 @@
 from typing import Union
 
 import numpy as np
-from Environments import Inventory
+from sympy.physics.units import acceleration
+
+from NewEnvironment import Inventory
 
 
 class ProBSP:
@@ -17,7 +19,7 @@ class ProBSP:
             capacity (int): The maximum inventory capacity of the environment.
             machines (int): The number of machines in the environment.
         """
-    def __init__(self, env: Union[Inventory], n,xo):
+    def __init__(self, env: Union[Inventory], n,xo, max_batch_size):
         """
             Initializes the ProBSP policy.
 
@@ -25,14 +27,16 @@ class ProBSP:
                 inventory (Inventory): The inventory environment instance.
                 n (int): The base stock level adjustment factor.
                 xo (float): The degradation threshold (percentage) for ordering spare parts.
+                max_batch_size: the maximum size of a batch
         """
         self.xo = xo / 100
         self.n = n
         self.capacity = env.inventory_capacity
         self.machines = env.num_machines
+        self.max_batch_size = max_batch_size
 
     def __repr__(self):
-        return f"Threshold Policy with N={self.n} and Xo={self.xo * 100}"
+        return f"ProBSP with N={self.n} and Xo={self.xo * 100}"
 
     def predict(self, obs, *args, **kwargs):
         """
@@ -50,13 +54,13 @@ class ProBSP:
                 tuple: The action to take (int) and None (placeholder for compatibility).
             """
         degradations = obs[:self.machines]
-        outstanding = obs[-1] * self.capacity
-        inventory = obs[-2] * self.capacity
-        demand = np.sum(degradations >= self.xo, dtype=int)
+        inventory = obs[self.machines] * self.capacity
+        outstanding = np.sum(obs[self.machines+1:]) * self.capacity
+        demand = np.sum(degradations >= self.xo)
         action = demand + self.n - outstanding - inventory
-        # action = np.round(action)
-        action = min(action, self.capacity - outstanding - inventory)
-        return action.astype(int), None
+        action = min(action, self.capacity - outstanding - inventory, self.max_batch_size)
+        action = np.round(action)
+        return action, None
 
 
 class BaseStockPolicy:
@@ -67,7 +71,7 @@ class BaseStockPolicy:
             stock (int): The base stock level.
             max_capacity (int): The maximum inventory capacity of the environment.
     """
-    def __init__(self, env: Inventory, bs_level):
+    def __init__(self, env: Inventory, bs_level, max_batch_size):
         """
                 Initializes the Base Stock Policy.
 
@@ -78,8 +82,10 @@ class BaseStockPolicy:
                 Raises:
                     AssertionError: If the base stock level exceeds the maximum capacity.
             """
+        self.machines = env.num_machines
         self.stock = bs_level
         self.max_capacity = env.inventory_capacity
+        self.max_batch_size = max_batch_size
         assert bs_level <= self.max_capacity, f"BS level cannot be higher than capacity"
 
     def __repr__(self):
@@ -102,14 +108,15 @@ class BaseStockPolicy:
             Raises:
                 ValueError: If the action would lead to excess stock or is negative.
         """
-        cur_stock = obs[-2] * self.max_capacity
-        cur_outstanding = obs[-1] * self.max_capacity
-        inventory_position = cur_stock + cur_outstanding
+        inventory = obs[self.machines] * self.max_capacity
+        outstanding = np.sum(obs[self.machines + 1:]) * self.max_capacity
+        inventory_position = inventory + outstanding
         action = self.stock - inventory_position
-        # if np.round(action + inventory_position) > self.stock:
+        # if np.round(action + inventory_position) > self.max_capacity:
         #     raise ValueError(f"Got Action that would lead to excess stock"
         #                      f" action={action}, IP={inventory_position}")
         # if action < 0:
         #     raise ValueError(f"Action={action} cannot be negative, obs={obs}"
         #                      f" Policy={self}")
-        return action, None
+        action = min(action, self.max_batch_size)
+        return np.round(action), None

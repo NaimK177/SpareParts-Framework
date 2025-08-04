@@ -2,8 +2,7 @@ import time
 from typing import Union
 import concurrent.futures
 import numpy as np
-from Environments import Inventory
-from NewEnvironment import InventoryAggregated, Inventory
+from NewEnvironment import InventoryAggregated, Inventory, InventoryRS
 from Policies import BaseStockPolicy, ProBSP
 from sb3_contrib import MaskablePPO as PPO
 from MaskedDQN import MaskedDoubleDQN as DQN
@@ -18,13 +17,13 @@ def run_replication(env, policy, length, burn_in):
         action, _states = policy.predict(obs, deterministic=True, action_masks=env.action_masks())
         obs, cost, terminated, truncated, info = env.step(action)
         _cum_costs += cost
-    cost = _cum_costs / length * env.max_cost
+    cost = info["average_cost"]
     ES = info["average_inventory"]
     FR = info["fill_rate"]
     return cost, ES, FR
 
 
-def evaluate_policy(env: Union[Inventory, InventoryAggregated], policy: Union[BaseStockPolicy, ProBSP, PPO, DQN],
+def evaluate_policy(env: Union[Inventory, InventoryRS], policy: Union[BaseStockPolicy, ProBSP, PPO, DQN],
                     replication: int = 10, length:int = 20000, burn_in: int = 2000,
                     processors:int=2):
     """
@@ -80,7 +79,7 @@ def evaluate_policy(env: Union[Inventory, InventoryAggregated], policy: Union[Ba
     std_FR = np.nanstd(FR_array)
     avg_ES = np.nanmean(ES_array)
     std_ES = np.nanstd(ES_array)
-    print(f"{policy} - {replication} replications - {length} steps - {burn_in} burn-in period avg:")
+    print(f"{policy} - {env} - {replication} replications - {length} steps - {burn_in} burn-in period avg:")
     print(f"Costs={abs(avg_cost)} ± {std_cost:.4f} \t E[S]={avg_ES:.4f} ± {std_ES:.4f} \t "
           f"FR={avg_FR:.4f} ± {std_FR:.4f} \t Total Eval Time={end_t-start_t:.4f}")
     return abs(avg_cost), std_cost, avg_FR, std_FR, avg_ES, std_ES
@@ -93,11 +92,14 @@ def find_bsp(env: Inventory):
     best_cost = np.inf
     step = 1
     for iterations in range(machines + 1):
-        cost = evaluate_policy(env, policy=BaseStockPolicy(env=env, bs_level=bsp), replication=8)[0]
+        cost = evaluate_policy(env, policy=BaseStockPolicy(env=env, bs_level=bsp, max_batch_size=env.max_batch_size),
+                               replication=8)[0]
         if cost < best_cost:
             best_cost = cost
             best_bsp = bsp
             bsp += step
+            if bsp > machines:
+                break
         else:
             break
     return best_bsp, best_cost
@@ -114,8 +116,8 @@ def find_xo(env:Inventory, xo_start=0, initial_inventory=0):
     iter_best_cost = np.inf
     iter_old_best_cost = np.inf
     for iterations in range(20):
-        cost = evaluate_policy(inventory, policy=ProBSP(env=inventory, xo=xo, n=initial_inventory),
-                               replication=8)[0]
+        cost = evaluate_policy(inventory, policy=ProBSP(env=inventory, xo=xo, n=initial_inventory,
+                                                        max_batch_size=env.max_batch_size), replication=8)[0]
         if cost < iter_best_cost:
             iter_old_best_xo = iter_best_xo
             iter_old_best_cost = iter_best_cost

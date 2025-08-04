@@ -13,9 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-
-
-from Environments import Inventory
+from NewEnvironment import Inventory
 
 torch.set_default_device("cpu")
 
@@ -131,6 +129,9 @@ class MaskedDQN:
         else:
             self.write_tensorboard = False
 
+    def __str__(self):
+        return "DQN"
+
     def save(self, path: str):
         torch.save(self.policy_net, path)
 
@@ -218,8 +219,9 @@ class MaskedDQN:
         target_q_values = self.target_net(non_final_next_states)
         masked_target_q_value = torch.masked.masked_tensor(target_q_values, mask_batch)
         _values = masked_target_q_value.amax(1)
-        _actions_prime = masked_target_q_value.argmax(1)
-        return torch.tensor(_values.get_data()), torch.tensor(_actions_prime.get_data())
+        return torch.tensor(_values.get_data())
+        # _actions_prime = masked_target_q_value.argmax(1)
+        # return torch.tensor(_values.get_data()), torch.tensor(_actions_prime.get_data())
 
     def _optimize_model(self):
         if len(self.replay_memory) < self._b_size:
@@ -249,7 +251,7 @@ class MaskedDQN:
         # state value or 0 in case the state was final.
         next_state_values = torch.zeros(self._b_size)
         with torch.no_grad():
-            next_state_values, next_actions = self._get_next_value(next_state, mask_batch)
+            next_state_values = self._get_next_value(next_state, mask_batch)
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
         assert state_action_values.shape == expected_state_action_values.shape, (f"Shape mismatch between state and "
@@ -324,15 +326,19 @@ class MaskedDoubleDQN(MaskedDQN):
                          train_every, update_target_every, evaluate_every, verbose, write_tensorboard=write_tensorboard,
                          log_dir=log_dir)
 
+    def __str__(self):
+        return "DDQN"
+
     def _get_next_value(self, non_final_next_states, mask_batch):
         """ Compute the error in TD using the target action, and the policy q value:
         Error = R_{t+1} + gamma Q_{target}(S_{t+1}, best action from policy network (S_{t+1}))
         """
         policy_q_values = self.policy_net(non_final_next_states)
         policy_actions = torch.masked_fill(policy_q_values, ~mask_batch, -1000).argmax(dim=1)
+        # policy_actions = torch.where(mask_batch, policy_q_values, torch.tensor(-1000.0)).argmax(dim=1)
         target_q_values = self.target_net(non_final_next_states)
         _values = target_q_values.gather(1, policy_actions.unsqueeze(1))
         # _actions_prime = target_q_values.argmax(1)
         # _actions_prime = torch.masked_fill(policy_q_values, ~mask_batch, -1000).argmax(dim=1)
-        return _values, policy_actions.flatten()
+        return _values
 
