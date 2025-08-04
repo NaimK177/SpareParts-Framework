@@ -403,6 +403,7 @@ class InventoryRS(Inventory):
             probsp_xo=self.probsp_xo,
             gamma=self.gamma
         )
+        return dummy
 
     def get_rs_decision(self):
         if self.use_bsp:
