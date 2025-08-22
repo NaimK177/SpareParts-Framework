@@ -4,7 +4,6 @@
 from typing import Union
 
 import numpy as np
-from sympy.physics.units import acceleration
 
 from NewEnvironment import Inventory
 

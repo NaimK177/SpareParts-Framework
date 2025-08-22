@@ -26,7 +26,8 @@ class GeometricOrderPipeline:
         return self.outstanding_parts
 
     def add_order(self, a: int):
-        assert self.outstanding_parts + a <= self.capacity, f"Exceeded capacity"
+        assert self.outstanding_parts + a <= self.capacity, (f"Exceeded capacity: "
+                                                             f"{self.outstanding_parts} + {a} > {self.capacity}")
         if self.outstanding_parts == self.capacity:
             return
         idx = np.where(self.pipeline == 0)[0][0]
@@ -34,6 +35,10 @@ class GeometricOrderPipeline:
         self.outstanding_parts += a
 
     def get_arrivals(self):
+        """
+        Called in each time step
+        :return:
+        """
         arrivals_bool = self.bernoulli_rvs[self.rvs_idx]
         self.rvs_idx += 1
         self._check_rvs()
@@ -92,6 +97,115 @@ class GeometricOrderPipeline:
         self.samples = 100000
         self.bernoulli_rvs = np.random.binomial(1, self.p, (self.samples, self.capacity))
         self.rvs_idx = 0
+
+
+class BaseClassOrderPipeline:
+
+    def __init__(self, capacity: int):
+        self.capacity = capacity
+        self.pipeline = np.zeros(capacity, dtype=int)
+        self.remaining_time = np.ones(capacity, dtype=int) * -1
+        self.outstanding_parts = 0
+
+    def __len__(self):
+        return self.outstanding_parts
+
+    def add_order(self, a:int):
+        assert self.outstanding_parts + a <= self.capacity, (f"Exceeded capacity: On={self.pipeline}"
+                                                             f"{self.outstanding_parts} + {a} > {self.capacity}")
+        if self.outstanding_parts + a > self.capacity:
+            raise ValueError(f"Cannot add order to pipeline due to capacity."
+                             f"On={self.pipeline} and d_n={a}")
+        if a > 0:
+            first_idx = np.where(self.remaining_time == -1)[0][0]
+            self.pipeline[first_idx] = a
+            self.remaining_time[first_idx] = self._get_lead_time()
+            self.outstanding_parts += a
+        self._check()
+
+    def get_arrivals(self):
+        arrivals = 0
+        for i in range(self.capacity):
+            if self.remaining_time[i] == 0 and self.pipeline[i] > 0:
+                arrivals += self.pipeline[i]
+                self.remaining_time[i] -= 1
+            elif self.pipeline[i] > 0:
+                self.remaining_time[i] -= 1
+        self._compactify()
+        self.outstanding_parts -= arrivals
+        self._check()
+        return arrivals
+
+    def expedite_arrivals(self, expedites_needed:int):
+        assert expedites_needed > 0, f"Number of expedites should be positive"
+        arrivals = 0
+        r = expedites_needed
+        if self.outstanding_parts > 0:
+            for i in range(self.capacity):
+                if self.pipeline[i] > 0 and self.remaining_time[i] > -1:
+                    if self.pipeline[i] <= r:
+                        r -= self.pipeline[i]
+                        self.pipeline[i] = 0
+                        self.remaining_time[i] = -1
+                    else:
+                        self.pipeline[i] -= r
+                        r = 0
+                        break
+            arrivals = expedites_needed - r
+            self.outstanding_parts -= arrivals
+            self._check()
+            self._compactify()
+            self._check()
+            return arrivals
+        else:
+            return arrivals
+
+    def _check(self):
+        if self.outstanding_parts != np.sum(self.pipeline):
+            raise ValueError("There was a discrepancy in the outstanding orders handling")
+
+    def copy(self):
+        pass
+
+    def reset(self):
+        self.pipeline = np.zeros(self.capacity, dtype=int)
+        self.remaining_time = np.ones(self.capacity, dtype=int) * -1
+        self.outstanding_parts = 0
+
+    def _get_lead_time(self):
+        pass
+
+    def _compactify(self):
+        _temp_pipeline = np.zeros_like(self.pipeline)
+        _temp_remaining_time = np.ones_like(self.remaining_time) * -1
+        _idx = 0
+        for i in range(self.capacity):
+            if self.pipeline[i] > 0 and self.remaining_time[i] >= 0:
+                _temp_pipeline[_idx] = self.pipeline[i]
+                _temp_remaining_time[_idx] = self.remaining_time[i]
+                _idx += 1
+        self.pipeline = _temp_pipeline
+        self.remaining_time = _temp_remaining_time
+
+
+class DeterministicOrderPipeline(BaseClassOrderPipeline):
+
+    def __init__(self, capacity:int, lead_time:int):
+        super().__init__(capacity=capacity)
+        self.lead_time = lead_time
+
+    def _get_lead_time(self):
+        return self.lead_time
+
+
+class UniformOrderPipeline(BaseClassOrderPipeline):
+
+    def __init__(self, capacity:int, lower_lead_time:int, upper_lead_time:int):
+        super().__init__(capacity)
+        self.lead_times = [x for x in range(lower_lead_time, upper_lead_time+1)]
+
+    def _get_lead_time(self):
+        return random.choice(self.lead_times)
 
 
 class Inventory(gym.Env):

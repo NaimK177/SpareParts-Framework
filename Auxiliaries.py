@@ -2,7 +2,7 @@ import time
 from typing import Union
 import concurrent.futures
 import numpy as np
-from NewEnvironment import InventoryAggregated, Inventory, InventoryRS
+from NewEnvironment import Inventory, InventoryRS
 from Policies import BaseStockPolicy, ProBSP
 from sb3_contrib import MaskablePPO as PPO
 from MaskedDQN import MaskedDoubleDQN as DQN
@@ -24,8 +24,8 @@ def run_replication(env, policy, length, burn_in):
 
 
 def evaluate_policy(env: Union[Inventory, InventoryRS], policy: Union[BaseStockPolicy, ProBSP, PPO, DQN],
-                    replication: int = 10, length:int = 20000, burn_in: int = 2000,
-                    processors:int=2):
+                    replication: int = 12, length:int = 20000, burn_in: int = 2000,
+                    processors:int=1):
     """
         Evaluates a given policy in the specified inventory environment.
 
@@ -93,7 +93,7 @@ def find_bsp(env: Inventory):
     step = 1
     for iterations in range(machines + 1):
         cost = evaluate_policy(env, policy=BaseStockPolicy(env=env, bs_level=bsp, max_batch_size=env.max_batch_size),
-                               replication=8)[0]
+                               replication=12, processors=1)[0]
         if cost < best_cost:
             best_cost = cost
             best_bsp = bsp
@@ -115,9 +115,10 @@ def find_xo(env:Inventory, xo_start=0, initial_inventory=0):
     iter_old_best_xo = xo_start
     iter_best_cost = np.inf
     iter_old_best_cost = np.inf
-    for iterations in range(20):
+    for iterations in range(30):
         cost = evaluate_policy(inventory, policy=ProBSP(env=inventory, xo=xo, n=initial_inventory,
-                                                        max_batch_size=env.max_batch_size), replication=8)[0]
+                                                        max_batch_size=env.max_batch_size),
+                               replication=12, processors=1)[0]
         if cost < iter_best_cost:
             iter_old_best_xo = iter_best_xo
             iter_old_best_cost = iter_best_cost
