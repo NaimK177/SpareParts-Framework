@@ -91,6 +91,7 @@ class MaskedDQN:
                  verbose=0,
                  write_tensorboard:bool=False,
                  log_dir="runs/DQN/",
+                 dqn_model=DQN
                  ):
         self.env = env
         self._b_size = b_size
@@ -106,7 +107,7 @@ class MaskedDQN:
         self._replay_memory_size = replay_memory_size
         self.evaluate_every = evaluate_every
         self.verbose = verbose
-        self.dqn_model = DQN
+        self.dqn_model = dqn_model
 
         # Inner data
         self.replay_memory = ReplayMemory(self._replay_memory_size)

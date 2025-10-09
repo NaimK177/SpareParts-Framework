@@ -1,5 +1,5 @@
 import random
-from typing import Tuple
+from typing import Tuple, Union
 
 import gym as gym
 import numpy as np
@@ -50,13 +50,6 @@ class GeometricOrderPipeline:
                 new_pipeline[j] = self.pipeline[i]
                 j += 1
         self.pipeline = new_pipeline
-
-        # Vectorized compaction
-        # remaining_mask = (self.pipeline > 0) & (~arrivals_bool)
-        # remaining_orders = self.pipeline[remaining_mask.astype(bool)]
-        #
-        # self.pipeline.fill(0)
-        # self.pipeline[:len(remaining_orders)] = remaining_orders
 
         self.outstanding_parts -= arrivals
         return arrivals
@@ -206,6 +199,17 @@ class UniformOrderPipeline(BaseClassOrderPipeline):
 
     def _get_lead_time(self):
         return random.choice(self.lead_times)
+
+class EmpiricalOrderPipeline(BaseClassOrderPipeline):
+
+    def __init__(self, capacity: int, lead_times:Union[list, np.array], lead_time_dist:Union[list, np.array]):
+        super().__init__(capacity)
+        self.lead_time_dist = lead_time_dist
+        self.lead_times = lead_times
+
+    def _get_lead_time(self):
+        return random.choices(population=self.lead_times, weights=self.lead_time_dist, k=1)[0]
+
 
 
 class Inventory(gym.Env):
@@ -382,7 +386,7 @@ class Inventory(gym.Env):
 
         return obs, -step_costs / self.max_cost, False, False, info
 
-    def _get_obs(self):
+    def _get_obs(self, normalized=True):
         if self.sorted_degradation:
             array = np.append(np.sort(self.degradations) / self._maintenance_threshold,
                               [self.inventory_level / self.inventory_capacity,

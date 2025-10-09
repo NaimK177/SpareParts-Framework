@@ -26,19 +26,26 @@ from Policies import BaseStockPolicy, ProBSP
 
 file_path = "results.csv"
 
-policy = ['ppo', 'dqn', 'bsp', 'probsp', 'ppo_probsp', 'ppo_bsp']
+policy = ['ppo', 'dqn', 'bsp', 'probsp', 'ppo_probsp', 'ppo_bsp', 'dqn_bsp', 'dqn_probsp']
 env = [Inventory]
-num_machines = [1, 2, 5, 10, 30]
-p = [0.2, 0.5]
-mttf = [5, 10]
+num_machines = [1, 2, 5, 10, 30]  # 5
+p = [0.2, 0.5]  # 2
+mttf = [5, 10, 20]  # 3
 a = [1]
 co = [2]
-ce = [5, 10]
-batch_size = [3, 5]
+ce = [5, 10]  # 2
+batch_size = [3, 5]  # 2
+
+num_machines = [1, 5, 30]
+policy = ['probsp']
+ce=[5]
+batch_size = [5]
+
 
 combinations = list(product(policy, env, num_machines, p, mttf, a, co, ce, batch_size))
 total_experiments = len(combinations)
 print(f"Total Experiments = {total_experiments}")
+exit("Hi")
 with open(file_path, mode='r') as file:
     df = pd.read_csv(file)
 file.close()
@@ -123,7 +130,7 @@ def run_experiment(experiment_data:list):
     else:
         return 0
 
-    avg_cost, std_cost, avg_FR, std_FR, avg_ES, std_ES = evaluate_policy(env, pol)
+    avg_cost, std_cost, avg_FR, std_FR, avg_ES, std_ES = evaluate_policy(env, pol, processors=4)
     data = [policy,n,xo,str(env), env.num_machines, env.order_pipeline.p, env.mttf, env.degradation_a, env._ordering_cost,
             env._emergency_cost, env.max_batch_size, env.sorted_degradation,
             avg_cost, std_cost, avg_FR, std_FR, avg_ES, std_ES]
@@ -133,6 +140,6 @@ def run_experiment(experiment_data:list):
     file.close()
 
 if __name__ == '__main__':
-    with concurrent.futures.ProcessPoolExecutor(2) as executor:
+    with concurrent.futures.ProcessPoolExecutor(1) as executor:
         for r in executor.map(run_experiment, combinations):
             print(r)

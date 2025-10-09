@@ -20,6 +20,7 @@ def run_replication(env, policy, length, burn_in):
     cost = info["average_cost"]
     ES = info["average_inventory"]
     FR = info["fill_rate"]
+    print(info)
     return cost, ES, FR
 
 
