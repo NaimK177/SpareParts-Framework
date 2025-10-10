@@ -39,7 +39,7 @@ evaluate_policy(env=inventory, policy=ppo, replication=8, processors=4)
 # Let us learn using a DQN policy
 print("Learning a policy using DQN")
 dqn = DDQN(env=inventory, verbose=0, eps_decay=20000)
-ppo.learn(200000)
+dqn.learn(200000)
 print("Finished Learning DQN policy, evaluating .......")
 evaluate_policy(env=inventory, policy=dqn, replication=8, processors=4)
 
@@ -52,7 +52,8 @@ inventory_rs = InventoryRS(machines=num_machines,
                            probsp=True,
                            bsp=False,
                            probsp_xo=xo,
-                           probsp_n=n
+                           probsp_n=n,
+                           gamma=0.99
                            )
 
 # Again, let us learn using a PPO policy
@@ -65,7 +66,7 @@ evaluate_policy(env=inventory_rs, policy=ppo, replication=8, processors=4)
 # Let us learn using a DQN policy
 print("Learning a policy using DQN")
 dqn = DDQN(env=inventory_rs, verbose=0, eps_decay=20000)
-ppo.learn(200000)
+dqn.learn(200000)
 print("Finished Learning DQN policy, evaluating .......")
 evaluate_policy(env=inventory_rs, policy=dqn, replication=8, processors=4)
 

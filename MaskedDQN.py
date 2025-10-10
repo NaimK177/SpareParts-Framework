@@ -86,7 +86,7 @@ class MaskedDQN:
                  learning_rate=1e-4,
                  replay_memory_size: int = 600000,
                  train_every: int = 2,
-                 update_target_every: int = 20000,
+                 update_target_every: int = 10000,
                  evaluate_every: int = 0,
                  verbose=0,
                  write_tensorboard:bool=False,
@@ -317,7 +317,7 @@ class MaskedDoubleDQN(MaskedDQN):
                  learning_rate=1e-4,
                  replay_memory_size: int = 300000,
                  train_every: int = 2,
-                 update_target_every: int = 20000,
+                 update_target_every: int = 10000,
                  evaluate_every: int = 0,
                  verbose=0,
                  write_tensorboard=False,
@@ -336,7 +336,10 @@ class MaskedDoubleDQN(MaskedDQN):
         """
         policy_q_values = self.policy_net(non_final_next_states)
         policy_actions = torch.masked_fill(policy_q_values, ~mask_batch, -1000).argmax(dim=1)
+        # policy_actions = torch.where(mask_batch, policy_q_values, torch.tensor(-1000.0)).argmax(dim=1)
         target_q_values = self.target_net(non_final_next_states)
         _values = target_q_values.gather(1, policy_actions.unsqueeze(1))
+        # _actions_prime = target_q_values.argmax(1)
+        # _actions_prime = torch.masked_fill(policy_q_values, ~mask_batch, -1000).argmax(dim=1)
         return _values
 
