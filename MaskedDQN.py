@@ -60,8 +60,8 @@ class DQN(nn.Module):
         self.layer2 = nn.Linear(128, 128)
         self.layer3 = nn.Linear(128, 128)
         self.layer4 = nn.Linear(128, env.action_space.n)
-        # with torch.no_grad():
-        #     self.layer4.bias.fill_(0)
+        with torch.no_grad():
+            self.layer4.bias.fill_(0)
 
 
     # Called with either one element to determine next action, or a batch

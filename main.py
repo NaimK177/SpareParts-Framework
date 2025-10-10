@@ -50,6 +50,7 @@ inventory_rs = InventoryRS(machines=num_machines,
 		                   mttf=mttf,
 		                   sorted_degradation=sort_degradation,
                            probsp=True,
+                           bsp=False,
                            probsp_xo=xo,
                            probsp_n=n
                            )
