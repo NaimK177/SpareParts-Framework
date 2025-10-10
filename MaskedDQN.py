@@ -60,8 +60,8 @@ class DQN(nn.Module):
         self.layer2 = nn.Linear(128, 128)
         self.layer3 = nn.Linear(128, 128)
         self.layer4 = nn.Linear(128, env.action_space.n)
-        with torch.no_grad():
-            self.layer4.bias.fill_(0)
+        # with torch.no_grad():
+        #     self.layer4.bias.fill_(0)
 
 
     # Called with either one element to determine next action, or a batch
@@ -336,10 +336,7 @@ class MaskedDoubleDQN(MaskedDQN):
         """
         policy_q_values = self.policy_net(non_final_next_states)
         policy_actions = torch.masked_fill(policy_q_values, ~mask_batch, -1000).argmax(dim=1)
-        # policy_actions = torch.where(mask_batch, policy_q_values, torch.tensor(-1000.0)).argmax(dim=1)
         target_q_values = self.target_net(non_final_next_states)
         _values = target_q_values.gather(1, policy_actions.unsqueeze(1))
-        # _actions_prime = target_q_values.argmax(1)
-        # _actions_prime = torch.masked_fill(policy_q_values, ~mask_batch, -1000).argmax(dim=1)
         return _values
 
