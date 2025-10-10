@@ -4,7 +4,8 @@ This repository provides the complete implementation, data, and simulation envir
 of machine degradation information into spare parts ordering decisions under stochastic lead times and batch ordering 
 constraints.
 
-This repository focuses on two algorithms: DQN and PPO. Another Repository focuses on the implementation of DCL algorithm.
+This repository focuses on two algorithms: DQN and PPO. 
+The repository [DCL-Spare-Parts](https://github.com/NaimK177/DCL-Spare-Parts) on the other hands implement the DCL algorithm within our problem setting.
 
 ## Overview
 Efficient spare parts management is essential for ensuring high availability and cost-effective maintenance 
