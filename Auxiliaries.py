@@ -8,7 +8,18 @@ from sb3_contrib import MaskablePPO as PPO
 from MaskedDQN import MaskedDoubleDQN as DQN
 
 
-def run_replication(env, policy, length, burn_in):
+def run_replication(env:Union[Inventory, InventoryRS], policy:Union[BaseStockPolicy, ProBSP, PPO, DQN],
+                    length:int, burn_in:int):
+
+    """
+    Run a single replication for the selected environment, and get the cost, average stock level, and the Fill rate
+
+    :param env: The inventory environment instance (Inventory or InventoryRS)
+    :param policy: The policy to be evaluated (BaseStockPolicy, ProBSP, PPO, or DQN)
+    :param length: Number of steps to run in the replication
+    :param burn_in: Number of initial steps to exclude from the cost calculation
+    :return: Tuple containing (cost, expected stock level, fill rate)
+    """
     obs, info = env.reset()
     _cum_costs = 0
     for step in range(length + burn_in):
@@ -20,12 +31,11 @@ def run_replication(env, policy, length, burn_in):
     cost = info["average_cost"]
     ES = info["average_inventory"]
     FR = info["fill_rate"]
-    print(info)
     return cost, ES, FR
 
 
 def evaluate_policy(env: Union[Inventory, InventoryRS], policy: Union[BaseStockPolicy, ProBSP, PPO, DQN],
-                    replication: int = 12, length:int = 20000, burn_in: int = 2000,
+                    replication: int = 10, length:int = 20000, burn_in: int = 2000,
                     processors:int=1):
     """
         Evaluates a given policy in the specified inventory environment.
@@ -87,6 +97,11 @@ def evaluate_policy(env: Union[Inventory, InventoryRS], policy: Union[BaseStockP
 
 
 def find_bsp(env: Inventory):
+    """
+    Find the Base Stock policy parameter for a given inventory instance
+    :param env: The inventory environment instance.
+    :return: the base stock level N
+    """
     machines = env.num_machines
     bsp = 0
     best_bsp = 0
@@ -107,6 +122,18 @@ def find_bsp(env: Inventory):
 
 
 def find_xo(env:Inventory, xo_start=0, initial_inventory=0):
+    """
+    Find the best ordering threshold (xo) for an inventory environment given an initial stock level.
+
+    Args:
+        env (Inventory): The inventory environment instance.
+        xo_start (int, optional): Initial value for the ordering threshold. Defaults to 0.
+        initial_inventory (int, optional): Initial stock level. Defaults to 0.
+
+    Returns: tuple: A tuple containing:
+        - best_xo (int): The optimal ordering threshold value.
+        - best_cost (float): The minimum cost achieved with the optimal threshold.
+    """
     inventory = env
     xo = xo_start
     step = -5

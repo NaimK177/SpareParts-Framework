@@ -1,6 +1,5 @@
 import random
 from typing import Tuple, Union
-
 import gym as gym
 import numpy as np
 from gym import spaces
@@ -8,8 +7,28 @@ from gym.core import ActType, ObsType
 
 
 class GeometricOrderPipeline:
+    """
+       Order pipeline with geometric arrival process.
 
+       Models spare parts orders in transit where each order has a fixed probability
+       of arriving in each time step, resulting in a geometric distribution for lead times.
+
+       Attributes:
+           p (float): Probability that an order arrives in any given time step.
+           capacity (int): Maximum number of concurrent orders that can be in the pipeline.
+           pipeline (np.ndarray): Array tracking order quantities at each position.
+           outstanding_parts (int): Total number of parts currently in the pipeline.
+           seed (int, optional): Random seed for reproducibility.
+   """
     def __init__(self, capacity: int, p: float, seed=None):
+        """
+            Initialize the geometric order pipeline.
+
+            Args:
+                capacity: Maximum number of orders that can be outstanding simultaneously.
+                p: Arrival probability per time step (0 < p <= 1).
+                seed: Random seed for reproducibility. Defaults to None.
+        """
         self.p = p
         self.capacity = capacity
         self.pipeline = np.zeros(capacity, dtype=int)
@@ -26,6 +45,15 @@ class GeometricOrderPipeline:
         return self.outstanding_parts
 
     def add_order(self, a: int):
+        """
+        Add a new order to the pipeline.
+
+        Args:
+            a: Quantity of parts to order.
+
+        Raises:
+            AssertionError: If adding the order would exceed pipeline capacity.
+        """
         assert self.outstanding_parts + a <= self.capacity, (f"Exceeded capacity: "
                                                              f"{self.outstanding_parts} + {a} > {self.capacity}")
         if self.outstanding_parts == self.capacity:
@@ -36,8 +64,13 @@ class GeometricOrderPipeline:
 
     def get_arrivals(self):
         """
-        Called in each time step
-        :return:
+        Process arrivals for the current time step using Bernoulli trials.
+
+        Each order in the pipeline has probability p of arriving. Orders that
+        arrive are removed from the pipeline and their quantities are summed.
+
+        Returns:
+            int: Total quantity of parts that arrived in this time step.
         """
         arrivals_bool = self.bernoulli_rvs[self.rvs_idx]
         self.rvs_idx += 1
@@ -55,6 +88,21 @@ class GeometricOrderPipeline:
         return arrivals
 
     def expedite_arrivals(self, expedites_needed: int):
+        """
+        Expedite orders from the pipeline for emergency situations.
+
+        Pulls parts from the pipeline immediately, starting with the oldest orders.
+        Used when urgent demand exceeds available inventory.
+
+        Args:
+            expedites_needed: Number of parts needed immediately.
+
+        Returns:
+            int: Actual number of parts expedited (may be less if insufficient outstanding).
+
+        Raises:
+            AssertionError: If expedites_needed is not positive.
+        """
         assert expedites_needed > 0, f"Number of expedites should be positive"
         if self.outstanding_parts > 0:
             r = expedites_needed
@@ -93,8 +141,25 @@ class GeometricOrderPipeline:
 
 
 class BaseClassOrderPipeline:
+    """
+    Base class for order pipelines.
 
+    Models spare parts orders where each order has a specific remaining time
+    until arrival. **Subclasses implement different lead time distributions**.
+
+    Attributes:
+        capacity (int): Maximum number of concurrent orders in the pipeline.
+        pipeline (np.ndarray): Array of order quantities at each position.
+        remaining_time (np.ndarray): Time steps remaining until each order arrives.
+        outstanding_parts (int): Total parts currently in the pipeline.
+    """
     def __init__(self, capacity: int):
+        """
+        Initialize the base order pipeline.
+
+        Args:
+            capacity: Maximum number of orders that can be outstanding simultaneously.
+        """
         self.capacity = capacity
         self.pipeline = np.zeros(capacity, dtype=int)
         self.remaining_time = np.ones(capacity, dtype=int) * -1
@@ -104,6 +169,16 @@ class BaseClassOrderPipeline:
         return self.outstanding_parts
 
     def add_order(self, a:int):
+        """
+        Add a new order to the pipeline with a sampled lead time.
+
+        Args:
+            a: Quantity of parts to order.
+
+        Raises:
+            AssertionError: If adding the order would exceed capacity.
+            ValueError: If capacity constraint is violated.
+        """
         assert self.outstanding_parts + a <= self.capacity, (f"Exceeded capacity: On={self.pipeline}"
                                                              f"{self.outstanding_parts} + {a} > {self.capacity}")
         if self.outstanding_parts + a > self.capacity:
@@ -117,6 +192,15 @@ class BaseClassOrderPipeline:
         self._check()
 
     def get_arrivals(self):
+        """
+        Process arrivals for the current time step.
+
+        Decrements remaining time for all orders. Orders with remaining_time == 0
+        arrive and are removed from the pipeline.
+
+        Returns:
+            int: Total quantity of parts that arrived in this time step.
+        """
         arrivals = 0
         for i in range(self.capacity):
             if self.remaining_time[i] == 0 and self.pipeline[i] > 0:
@@ -130,6 +214,20 @@ class BaseClassOrderPipeline:
         return arrivals
 
     def expedite_arrivals(self, expedites_needed:int):
+        """
+        Expedite orders from the pipeline for emergency situations.
+
+        Pulls parts from the pipeline immediately, regardless of remaining time.
+
+        Args:
+            expedites_needed: Number of parts needed immediately.
+
+        Returns:
+            int: Actual number of parts expedited.
+
+        Raises:
+            AssertionError: If expedites_needed is not positive.
+        """
         assert expedites_needed > 0, f"Number of expedites should be positive"
         arrivals = 0
         r = expedites_needed
@@ -166,9 +264,17 @@ class BaseClassOrderPipeline:
         self.outstanding_parts = 0
 
     def _get_lead_time(self):
+        """
+        Sample a lead time for a new order. To be implemented by subclasses.
+
+        Returns:
+            int: Lead time in time steps.
+        """
         pass
 
     def _compactify(self):
+        """Compact the pipeline by removing empty slots and moving active orders forward."""
+
         _temp_pipeline = np.zeros_like(self.pipeline)
         _temp_remaining_time = np.ones_like(self.remaining_time) * -1
         _idx = 0
@@ -182,7 +288,14 @@ class BaseClassOrderPipeline:
 
 
 class DeterministicOrderPipeline(BaseClassOrderPipeline):
+    """
+    Order pipeline with deterministic (fixed) lead times.
 
+    All orders take exactly the same amount of time to arrive.
+
+    Attributes:
+        lead_time (int): Fixed lead time for all orders in time steps.
+    """
     def __init__(self, capacity:int, lead_time:int):
         super().__init__(capacity=capacity)
         self.lead_time = lead_time
@@ -192,7 +305,14 @@ class DeterministicOrderPipeline(BaseClassOrderPipeline):
 
 
 class UniformOrderPipeline(BaseClassOrderPipeline):
+    """
+    Order pipeline with uniformly distributed lead times.
 
+    Lead times are sampled uniformly from a discrete range.
+
+    Attributes:
+        lead_times (list): List of possible lead time values.
+    """
     def __init__(self, capacity:int, lower_lead_time:int, upper_lead_time:int):
         super().__init__(capacity)
         self.lead_times = [x for x in range(lower_lead_time, upper_lead_time+1)]
@@ -201,7 +321,16 @@ class UniformOrderPipeline(BaseClassOrderPipeline):
         return random.choice(self.lead_times)
 
 class EmpiricalOrderPipeline(BaseClassOrderPipeline):
+    """
+    Order pipeline with empirically-defined lead time distribution.
 
+    Lead times are sampled according to user-specified probabilities,
+    allowing for arbitrary discrete distributions based on historical data.
+
+    Attributes:
+        lead_times (Union[list, np.array]): Possible lead time values.
+        lead_time_dist (Union[list, np.array]): Probability weights for each lead time.
+    """
     def __init__(self, capacity: int, lead_times:Union[list, np.array], lead_time_dist:Union[list, np.array]):
         super().__init__(capacity)
         self.lead_time_dist = lead_time_dist
@@ -213,7 +342,35 @@ class EmpiricalOrderPipeline(BaseClassOrderPipeline):
 
 
 class Inventory(gym.Env):
+    """
+   Spare parts inventory management environment with degrading machines.
 
+   A gym environment simulating spare parts inventory management for machines
+   that degrade over time. Machines require maintenance when degradation reaches
+   a threshold, consuming spare parts from inventory. The agent must balance
+   holding costs, ordering costs, and emergency expediting costs.
+
+   State space includes:
+       - Machine degradation levels (normalized)
+       - Current inventory level (normalized)
+       - Outstanding orders in pipeline (normalized)
+
+   Action space:
+       - Discrete: order quantity from 0 to max(inventory_capacity,batch_size)
+
+   Reward:
+       - Negative cost per time step (holding + ordering + emergency)
+       - Normalized by maximum possible cost
+
+   Attributes:
+       num_machines (int): Number of machines being maintained.
+       mttf (float): Mean time to failure parameter for degradation.
+       degradation_a (float): Shape parameter for gamma degradation process.
+       order_pipeline: Pipeline managing orders in transit.
+       max_batch_size (int): Maximum parts that can be ordered at once.
+       ordering_cost (float): ordering cost for a batch
+       emergency_cost (float): emergency cost for expediting a **part**
+   """
     def __init__(self,
                  machines: int,
                  order_pipeline: GeometricOrderPipeline,
@@ -224,6 +381,19 @@ class Inventory(gym.Env):
                  emergency_cost: float = 5,
                  sorted_degradation: bool = False,
                  ):
+        """
+        Initialize the inventory environment.
+
+        Args:
+            machines: Number of machines to maintain.
+            order_pipeline: Pipeline object managing order lead times.
+            max_batch_size: Maximum quantity per order. Defaults to 3.
+            mttf: Mean time to failure for degradation process. Defaults to 10.
+            a: Shape parameter for gamma degradation. Defaults to 1.
+            ordering_cost: Cost per regular order placed. Defaults to 2.
+            emergency_cost: Cost per part expedited. Defaults to 5.
+            sorted_degradation: If True, sort degradation levels in observation. Defaults to False.
+        """
         self.sorted_degradation = sorted_degradation
         self.inventory_capacity = machines
         self.max_batch_size = max_batch_size
@@ -302,7 +472,17 @@ class Inventory(gym.Env):
         return dummy
 
     def reset(self, seed=None, options=None):
-        # We need the following line to seed self.np_random
+        """
+        Reset the environment to initial state.
+
+        Args:
+            seed: Random seed for reproducibility. Defaults to None.
+            options: Additional options (unused). Defaults to None.
+
+        Returns:
+            tuple: (observation, info) where observation is the initial state
+                   and info contains metrics like costs and fill rate.
+        """
         super().reset(seed=seed)
         random.seed(seed)
 
@@ -332,6 +512,26 @@ class Inventory(gym.Env):
         return obs, info
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
+        """
+        Execute one time step in the environment, given an *action* from the decision maker
+
+        Processes: order arrivals, new order placement, degradation updates,
+        maintenance actions, and cost calculations.
+
+        Args:
+            action: Order quantity to place (0 to inventory_capacity).
+
+        Returns:
+            tuple: (observation, reward, terminated, truncated, info)
+                - observation: Current state after step
+                - reward: Negative normalized cost for this step
+                - terminated: Always False
+                - truncated: Always False
+                - info: Dictionary with cost breakdown and metrics
+
+        Raises:
+            AssertionError: If action violates capacity constraints or is negative.
+        """
         assert self.inventory_level >= 0, f"Outstanding orders are negative"
         assert action >= 0, (f"Action {action} orders are negative \n"
                              f"I={self.inventory_level}, On={self.order_pipeline.pipeline}")
@@ -411,6 +611,15 @@ class Inventory(gym.Env):
         }
 
     def _perform_maintenance(self):
+        """
+        Perform maintenance on machines exceeding degradation threshold.
+
+        Consumes spare parts from inventory. If insufficient inventory,
+        expedites orders from pipeline and incurs emergency costs.
+
+        Returns:
+            float: Total cost incurred from maintenance (emergency + ordering).
+        """
         machine_idx = np.where(self.degradations >= self._maintenance_threshold)[0]
         repairs = len(machine_idx)
         self.total_maintenance += repairs
@@ -432,12 +641,10 @@ class Inventory(gym.Env):
 
     def action_masks(self):
         """
-        Return an action mask with the allowable action having a True
+        Return an action mask with the allowable action having a True value
         :return:
         """
-        # mask = self._action_array <= max(0, self.inventory_capacity
-        #                                  - self.inventory_level
-        #                                  - self.outstanding_orders)
+
         mask = self._action_array <= min(self.max_batch_size, max(0, self.inventory_capacity - self.inventory_level -
                                                              self.order_pipeline.outstanding_parts))
         return mask.astype(dtype=bool)
@@ -445,7 +652,19 @@ class Inventory(gym.Env):
 
 class InventoryRS(Inventory):
     """
-    An inventory sub instance with reward shaping either from the BSP or ProBSP
+    Inventory environment with reward shaping.
+
+    Extends the base Inventory environment with potential-based reward shaping
+    based on either a Base-Stock Policy (BSP) or Probabilistic Base-Stock Policy (ProBSP).
+    Adds a penalty term to the reward that encourages following the heuristic policy.
+
+    Attributes:
+        use_bsp (bool): Whether to use Base-Stock Policy for shaping.
+        use_probsp (bool): Whether to use Proactive Base-Stock Policy for shaping.
+        bsp_n (int): Target stock level for BSP.
+        probsp_n (int): Base target level for ProBSP.
+        probsp_xo (float): Degradation threshold for ProBSP adjustment.
+        gamma (float): Discount factor for potential-based shaping.
     """
     def __init__(self,
                  machines: int,
@@ -464,21 +683,27 @@ class InventoryRS(Inventory):
                  gamma: float = None
                  ):
         """
+        Initialize reward-shaped inventory environment.
 
-        :param machines:
-        :param order_pipeline:
-        :param max_batch_size:
-        :param mttf:
-        :param a:
-        :param ordering_cost:
-        :param emergency_cost:
-        :param sorted_degradation:
-        :param bsp:
-        :param probsp:
-        :param bsp_n:
-        :param probsp_n:
-        :param probsp_xo:
-        :param gamma:
+        Args:
+            machines: Number of machines to maintain.
+            order_pipeline: Pipeline object managing order lead times.
+            max_batch_size: Maximum quantity per order. Defaults to 3.
+            mttf: Mean time to failure. Defaults to 10.
+            a: Degradation shape parameter. Defaults to 1.
+            ordering_cost: Cost per regular order. Defaults to 2.
+            emergency_cost: Cost per expedited part. Defaults to 5.
+            sorted_degradation: Sort degradation in observation. Defaults to False.
+            bsp: Use Base-Stock Policy for shaping. Defaults to True.
+            probsp: Use Proactive Base-Stock Policy. Defaults to False.
+            bsp_n: Target stock level for BSP. Required if bsp=True.
+            probsp_n: Base target level for ProBSP. Required if probsp=True.
+            probsp_xo: Degradation threshold for ProBSP. Required if probsp=True.
+            gamma: Discount factor (0-1). Required.
+
+        Raises:
+            AssertionError: If both bsp and probsp are True.
+            ValueError: If required parameters are missing or invalid.
         """
         super().__init__(machines=machines, order_pipeline=order_pipeline, max_batch_size=max_batch_size,
                          mttf=mttf, a=a, ordering_cost=ordering_cost, emergency_cost=emergency_cost,
@@ -524,6 +749,18 @@ class InventoryRS(Inventory):
         return dummy
 
     def get_rs_decision(self):
+        """
+        Compute the recommended action according to the chosen heuristic.
+
+        For BSP: Orders up to target level (bsp_n - inventory - outstanding).
+        For ProBSP: Adjusts target based on number of machines above degradation threshold.
+
+        Returns:
+            int: Recommended order quantity constrained by capacity and batch size.
+
+        Raises:
+            ValueError: If neither BSP nor ProBSP is enabled.
+        """
         if self.use_bsp:
             decision = min(self.bsp_n - self._old_inventory_level - self._old_outstanding_orders, self.max_batch_size)
         elif self.use_probsp:
@@ -536,19 +773,55 @@ class InventoryRS(Inventory):
         return decision
 
     def _compute_penalty(self, action):
+        """
+        Compute the potential-based reward shaping penalty.
+
+        Penalizes deviation from the heuristic policy decision. Uses potential-based
+        shaping to maintain optimal policy invariance.
+
+        Args:
+            action: The action taken by the agent.
+
+        Returns:
+            float: Shaped reward adjustment (negative of penalty).
+        """
         cur_potential = 0.0001 * abs(self.get_rs_decision() - action)
         penalty = self.gamma * cur_potential - self._previous_potential
         self._previous_potential = cur_potential
         return -penalty
 
     def step(self, action: int, verbose: bool = False):
+        """
+        Execute one time step with reward shaping.
+
+        Extends parent step() by adding potential-based shaping penalty.
+
+        Args:
+            action: Order quantity to place.
+            verbose: If True, print debug information. Defaults to False.
+
+        Returns:
+            tuple: (observation, shaped_reward, terminated, truncated, info)
+        """
         obs, costs, terminated, truncated, info = super().step(action)
         costs += self._compute_penalty(action)
         return obs, costs, terminated, truncated, info
 
 
-class InventoryAggregated(Inventory):
+class InventoryAggregated_NOTUSED(Inventory):
+    """
+    Inventory environment with aggregated order pipeline observation.
 
+    Differs from base Inventory by representing the order pipeline as aggregated
+    counts of orders by batch size rather than individual order positions. This
+    reduces observation space dimensionality when max_batch_size < inventory_capacity.
+
+    The pipeline observation contains max_batch_size elements, where element i
+    represents the count of outstanding orders of size (i+1).
+
+    Attributes:
+        All attributes from parent Inventory class.
+    """
     def __init__(self,
                  machines: int,
                  order_pipeline: GeometricOrderPipeline,
@@ -559,6 +832,19 @@ class InventoryAggregated(Inventory):
                  emergency_cost: float = 5,
                  sorted_degradation: bool = False,
                  ):
+        """
+        Initialize aggregated inventory environment.
+
+        Args:
+            machines: Number of machines to maintain.
+            order_pipeline: Pipeline object managing order lead times.
+            max_batch_size: Maximum quantity per order. Defaults to 3.
+            mttf: Mean time to failure. Defaults to 10.
+            a: Degradation shape parameter. Defaults to 1.
+            ordering_cost: Cost per regular order. Defaults to 2.
+            emergency_cost: Cost per expedited part. Defaults to 5.
+            sorted_degradation: Sort degradation in observation. Defaults to False.
+        """
         super().__init__(machines=machines, order_pipeline=order_pipeline, max_batch_size=max_batch_size,
                          mttf=mttf, a=a, ordering_cost=ordering_cost, emergency_cost=emergency_cost,
                          sorted_degradation=sorted_degradation)
@@ -586,7 +872,7 @@ class InventoryAggregated(Inventory):
                                             dtype=np.float32)
 
     def copy(self):
-        dummy = InventoryAggregated(
+        dummy = InventoryAggregated_NOTUSED(
             machines=self.num_machines,
             order_pipeline=self.order_pipeline,
             max_batch_size=self.max_batch_size,

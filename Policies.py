@@ -1,12 +1,6 @@
-
-
-
 from typing import Union
-
 import numpy as np
-
 from NewEnvironment import Inventory
-
 
 class ProBSP:
     """
@@ -111,11 +105,5 @@ class BaseStockPolicy:
         outstanding = np.sum(obs[self.machines + 1:]) * self.max_capacity
         inventory_position = inventory + outstanding
         action = self.stock - inventory_position
-        # if np.round(action + inventory_position) > self.max_capacity:
-        #     raise ValueError(f"Got Action that would lead to excess stock"
-        #                      f" action={action}, IP={inventory_position}")
-        # if action < 0:
-        #     raise ValueError(f"Action={action} cannot be negative, obs={obs}"
-        #                      f" Policy={self}")
         action = min(action, self.max_batch_size)
         return np.round(action), None
