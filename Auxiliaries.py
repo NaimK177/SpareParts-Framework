@@ -18,7 +18,7 @@ def run_replication(env:Union[Inventory, InventoryRS], policy:Union[BaseStockPol
     :param policy: The policy to be evaluated (BaseStockPolicy, ProBSP, PPO, or DQN)
     :param length: Number of steps to run in the replication
     :param burn_in: Number of initial steps to exclude from the cost calculation
-    :return: Tuple containing (cost, expected stock level, fill rate)
+    :return: Tuple containing (cost, expected stock level, fill rate, holding, ordering, emergency, order_size)
     """
     obs, info = env.reset()
     _cum_costs = 0
@@ -29,14 +29,18 @@ def run_replication(env:Union[Inventory, InventoryRS], policy:Union[BaseStockPol
         obs, cost, terminated, truncated, info = env.step(action)
         _cum_costs += cost
     cost = info["average_cost"]
+    holding_cost = info["holding_costs"]
+    ordering_cost = info["ordering_costs"]
+    emergency_cost = info["emergency_costs"]
     ES = info["average_inventory"]
     FR = info["fill_rate"]
-    return cost, ES, FR
+    order_size = info["average_order_size"]
+    return cost, ES, FR, holding_cost, ordering_cost, emergency_cost, order_size
 
 
 def evaluate_policy(env: Union[Inventory, InventoryRS], policy: Union[BaseStockPolicy, ProBSP, PPO, DQN],
                     replication: int = 10, length:int = 20000, burn_in: int = 2000,
-                    processors:int=1):
+                    processors:int=1, cost_structure:bool=False):
     """
         Evaluates a given policy in the specified inventory environment.
 
@@ -68,21 +72,29 @@ def evaluate_policy(env: Union[Inventory, InventoryRS], policy: Union[BaseStockP
     cost_array = np.ones(replication) * np.nan
     FR_array = np.ones(replication) * np.nan
     ES_array = np.ones(replication) * np.nan
+    holding_array = np.ones(replication) * np.nan
+    ordering_array = np.ones(replication) * np.nan
+    emergency_array = np.ones(replication) * np.nan
+    order_size_array = np.ones(replication) * np.nan
     start_t = time.time()
     if processors > 1 and policy in [ProBSP, BaseStockPolicy, PPO]:
         with concurrent.futures.ProcessPoolExecutor(processors) as executor:
             futures = [executor.submit(run_replication, env, policy, length, burn_in) for repl in range(replication)]
             for repl, future in enumerate(futures):
-                cost, ES, FR = future.result()
+                cost, ES, FR, hc, oc, ec, order_size = future.result()
                 cost_array[repl] = cost
                 ES_array[repl] = ES
                 FR_array[repl] = FR
     else:
         for repl in range(replication):
-            cost, ES, FR = run_replication(env, policy, length, burn_in)
+            cost, ES, FR, hc, oc, ec, order_size = run_replication(env, policy, length, burn_in)
             cost_array[repl] = cost
             ES_array[repl] = ES
             FR_array[repl] = FR
+            holding_array[repl] = hc
+            ordering_array[repl] = oc
+            emergency_array[repl] = ec
+            order_size_array[repl] = order_size
     end_t = time.time()
     avg_cost = np.nanmean(cost_array)
     std_cost = np.nanstd(cost_array)
@@ -90,9 +102,15 @@ def evaluate_policy(env: Union[Inventory, InventoryRS], policy: Union[BaseStockP
     std_FR = np.nanstd(FR_array)
     avg_ES = np.nanmean(ES_array)
     std_ES = np.nanstd(ES_array)
+
     print(f"{policy} - {env} - {replication} replications - {length} steps - {burn_in} burn-in period avg:")
     print(f"Costs={abs(avg_cost)} ± {std_cost:.4f} \t E[S]={avg_ES:.4f} ± {std_ES:.4f} \t "
           f"FR={avg_FR:.4f} ± {std_FR:.4f} \t Total Eval Time={end_t-start_t:.4f}")
+    if cost_structure:
+        print(f"Cost Structure:\n"
+              f"Holding:{np.nanmean(holding_array):.4f} \t Ordering:{np.nanmean(ordering_array):.4f} \t "
+              f"Emergency:{np.nanmean(emergency_array):.4f}")
+        print(f"Average Order Size={np.nanmean(order_size_array)}")
     return abs(avg_cost), std_cost, avg_FR, std_FR, avg_ES, std_ES
 
 

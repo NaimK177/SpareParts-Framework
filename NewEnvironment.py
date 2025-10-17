@@ -187,7 +187,8 @@ class BaseClassOrderPipeline:
         if a > 0:
             first_idx = np.where(self.remaining_time == -1)[0][0]
             self.pipeline[first_idx] = a
-            self.remaining_time[first_idx] = self._get_lead_time()
+            # TODO: check
+            self.remaining_time[first_idx] = self._get_lead_time()-1
             self.outstanding_parts += a
         self._check()
 
@@ -205,6 +206,7 @@ class BaseClassOrderPipeline:
         for i in range(self.capacity):
             if self.remaining_time[i] == 0 and self.pipeline[i] > 0:
                 arrivals += self.pipeline[i]
+                # self.pipeline[i] = 0
                 self.remaining_time[i] -= 1
             elif self.pipeline[i] > 0:
                 self.remaining_time[i] -= 1
@@ -373,7 +375,8 @@ class Inventory(gym.Env):
    """
     def __init__(self,
                  machines: int,
-                 order_pipeline: GeometricOrderPipeline,
+                 order_pipeline: Union[GeometricOrderPipeline, BaseClassOrderPipeline,
+                 DeterministicOrderPipeline, UniformOrderPipeline, EmpiricalOrderPipeline],
                  max_batch_size: int = 3,
                  mttf: float = 10.,
                  a: float = 1.,
@@ -455,6 +458,8 @@ class Inventory(gym.Env):
 
         self.time_step = 1
         self._average_stock = self.inventory_level
+        self._average_order_size = 0.
+        self._number_of_orders = 0
 
     def __str__(self):
         return "Inventory"
@@ -506,6 +511,9 @@ class Inventory(gym.Env):
         self.total_maintenance = 1
         self.total_expedited_orders = 0
 
+        self._average_order_size = 0.
+        self._number_of_orders = 0
+
         obs = self._get_obs()
         info = self._get_info()
 
@@ -536,6 +544,12 @@ class Inventory(gym.Env):
         assert action >= 0, (f"Action {action} orders are negative \n"
                              f"I={self.inventory_level}, On={self.order_pipeline.pipeline}")
         action = int(action)
+
+        if action > 0:
+            self._average_order_size = ((self._number_of_orders * self._average_order_size + action) /
+                                        (self._number_of_orders + 1))
+            self._number_of_orders += 1
+
         step_costs = 0.
 
         # Data stored for reward shaping implementation
@@ -603,10 +617,11 @@ class Inventory(gym.Env):
             "time_step": self.time_step,
             "total_cost": self._total_cost,
             "average_cost": self._total_cost / self.time_step,
-            "holding_costs": self._holding_total,
-            "ordering_costs": self._ordering_total,
-            "emergency_costs": self._emergency_total,
+            "holding_costs": self._holding_total/ self.time_step,
+            "ordering_costs": self._ordering_total/ self.time_step,
+            "emergency_costs": self._emergency_total/ self.time_step,
             "average_inventory": self._average_stock,
+            "average_order_size": self._average_order_size,
             "fill_rate": fill_rate
         }
 
@@ -668,7 +683,8 @@ class InventoryRS(Inventory):
     """
     def __init__(self,
                  machines: int,
-                 order_pipeline: GeometricOrderPipeline,
+                 order_pipeline: Union[GeometricOrderPipeline, BaseClassOrderPipeline,
+                 DeterministicOrderPipeline, UniformOrderPipeline, EmpiricalOrderPipeline],
                  max_batch_size:int = 3,
                  mttf: float = 10.,
                  a: float = 1.,
