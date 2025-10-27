@@ -5,7 +5,8 @@ of machine degradation information into spare parts ordering decisions under sto
 constraints.
 
 This repository focuses on two algorithms: DQN and PPO. 
-The repository [DCL-Spare-Parts](https://github.com/NaimK177/DCL-Spare-Parts) on the other hands implement the DCL algorithm within our problem setting.
+The repository [DCL-Spare-Parts](https://github.com/NaimK177/DCL-Spare-Parts) on the other hands implement the DCL 
+algorithm within our problem setting.
 
 ## Overview
 Efficient spare parts management is essential for ensuring high availability and cost-effective maintenance 
@@ -17,7 +18,7 @@ In addition to learning DRL-based policies, this framework enables a simple impl
 as shown in [Policies.py](Policies.py).
 
 ## Key Features
-* A simple OpenAI Gym-based environment
+* An OpenAI Gym-based environment
 * a general order pipeline enabling the selection of any lead time distribution via simple implementation in 
 [NewEnvironment.py](NewEnvironment.py).
 * A Masked DDQN algorithm 
@@ -35,5 +36,9 @@ The objective is to minimize total long-run cost, consisting of:
 The agent (policy) observes:
 * The degradation states of all machines,
 * The inventory level and outstanding orders,
-And decides how many parts to order at each time step.
+and decides how many parts to order at each time step.
 
+When a maintenance is required and no spare parts are available, parts are expedited from the outstanding order pipeline.
+If the order pipeline is empty, parts are ordered and expedited. The current expedition procedure is a FIFO procedure,
+where parts are expedited first from the oldest order. 
+The flexibility of the framework allows other implementations.
