@@ -3,84 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpareParts Framework Selection</title>
+    <title>Degradation-Aware Spare Parts Control Framework</title>
     <style>
         body {
-            font-family: sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica', 'Arial', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             margin: 0;
-            background-color: #f6f8fa; /* GitHub-like background */
-            color: #24292f; /* GitHub text color */
+            background-color: #f6f8fa;
+            color: #24292f;
         }
         .container {
             background-color: #ffffff;
-            padding: 40px;
-            border-radius: 6px;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-            max-width: 600px;
+            padding: 50px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-width: 650px;
             text-align: center;
         }
         h1 {
-            color: #0366d6; /* GitHub primary color */
-            margin-bottom: 20px;
+            color: #24292f;
+            margin-bottom: 10px;
+            font-size: 2em;
+            font-weight: 600;
+            line-height: 1.3;
         }
-        p {
-            margin-bottom: 30px;
+        .subtitle {
+            color: #586069;
+            margin-bottom: 40px;
             font-size: 1.1em;
+            font-weight: 400;
+        }
+        .description {
+            margin-bottom: 35px;
+            font-size: 1em;
+            color: #24292f;
+            line-height: 1.6;
         }
         .buttons-container {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 18px;
         }
         .btn {
-            display: block;
-            padding: 12px 20px;
-            border: 1px solid #0366d6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 16px 24px;
+            border: 1px solid #d0d7de;
             border-radius: 6px;
             text-decoration: none;
-            font-weight: bold;
-            font-size: 1em;
+            font-weight: 500;
+            font-size: 1.05em;
             cursor: pointer;
-            transition: background-color 0.2s, border-color 0.2s;
+            transition: all 0.2s ease;
         }
-        .btn-primary {
-            background-color: #0366d6;
+        .btn-python {
+            background-color: #2b5b84;
             color: white;
+            border-color: #2b5b84;
         }
-        .btn-secondary {
-            background-color: #ffffff;
-            color: #0366d6;
+        .btn-python:hover {
+            background-color: #1e4164;
+            border-color: #1e4164;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(43, 91, 132, 0.3);
         }
-        .btn-primary:hover {
-            background-color: #005cc5;
+        .btn-cpp {
+            background-color: #00599c;
+            color: white;
+            border-color: #00599c;
         }
-        .btn-secondary:hover {
-            background-color: #f1f8ff;
-            border-color: #005cc5;
+        .btn-cpp:hover {
+            background-color: #004482;
+            border-color: #004482;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 89, 156, 0.3);
+        }
+        .icon {
+            font-size: 1.3em;
+        }
+        .tech-details {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+        .footer-note {
+            margin-top: 40px;
+            font-size: 0.9em;
+            color: #586069;
+            padding-top: 30px;
+            border-top: 1px solid #d0d7de;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Welcome to SpareParts Framework</h1>
-        <p>Please select the version of the framework you wish to use:</p>
-
+        <h1>Welcome to the<br>Degradation-Aware Spare Parts Control Framework</h1>
+        <p class="subtitle">Leveraging Degradation Data in the Spare Parts Decision Making Process</p>
+        <p class="description">
+            Please select the implementation version that best suits your requirements:
+        </p>
         <div class="buttons-container">
-            <a href="https://github.com/NaimK177/SpareParts-Framework" class="btn btn-primary">
-                ⚙️ Python Version with DQN and PPO
+            <a href="https://github.com/NaimK177/SpareParts-Framework" class="btn btn-python">
+                <span class="icon">🐍</span>
+                <div>
+                    <div>Python Implementation (Gymnasium)</div>
+                    <div class="tech-details">DQN and PPO Algorithms</div>
+                </div>
             </a>
-
-            <a href="https://github.com/NaimK177/DCL-Spare-Parts" class="btn btn-secondary">
-                🚀 C++ version with DCL
+            <a href="https://github.com/NaimK177/DCL-Spare-Parts" class="btn btn-cpp">
+                <span class="icon">⚡</span>
+                <div>
+                    <div>C++ Implementation</div>
+                    <div class="tech-details">Deep Controlled Learning (DCL)</div>
+                </div>
             </a>
         </div>
-        <p style="margin-top: 30px; font-size: 0.9em; color: #586069;">
-            Note: All official documentation and development continues on the selected branch.
+        <p class="footer-note">
+            Official documentation and active development are maintained in the respective repositories.
         </p>
     </div>
 </body>
