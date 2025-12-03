@@ -519,7 +519,7 @@ class Inventory(gym.Env):
 
         return obs, info
 
-    def step(self, action: ActType) -> Tuple[ObsType, float, bool, bool, dict]:
+    def step(self, action: ActType, *args, **kwargs) -> Tuple[ObsType, float, bool, bool, dict]:
         """
         Execute one time step in the environment, given an *action* from the decision maker
 
@@ -597,7 +597,7 @@ class Inventory(gym.Env):
 
         obs = self._get_obs()
         info = self._get_info()
-
+        info['step_cost'] = step_costs
         return obs, -step_costs / self.max_cost, False, False, info
 
     def _get_obs(self, normalized=True):
